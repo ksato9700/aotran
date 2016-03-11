@@ -1,0 +1,21 @@
+{
+  "name": "aotran",
+  "version": "1.0.0",
+  "description": "Aozora Transporter",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@bitbucket.org/ksato/aotran.git"
+  },
+  "author": {
+    "name": "Kenichi Sato",
+    "email": "ksato9700@gmail.com"
+  },
+  "license": "BSD-3-Clause",
+  "dependencies": {
+    "google-auth-library": "0.9.7",
+    "googleapis": "2.1.7"
+  }
+}

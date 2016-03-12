@@ -3,31 +3,46 @@ var readline = require('readline');
 var google = require('googleapis');
 var googleAuth = require('google-auth-library');
 
-var SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly'];
+var SCOPES = [
+  // 'https://www.googleapis.com/auth/drive.metadata.readonly',
+  'https://www.googleapis.com/auth/drive.readonly',
+];
 var TOKEN_PATH = "./.token.json";
 
-function authorize() {
+//
+// class GAuth
+//
+var GAuth = function (client_id, client_secret, redirect_uri) {
   var auth = new googleAuth();
-  var oauth2client = new auth.OAuth2(
-    process.env.AOTRAN_CLIENT_ID,
-    process.env.AOTRAN_CLIENT_SECRET,
-    process.env.AOTRAN_REDIRECT_URI
-  );
-  
-  return new Promise (function(resolve, reject) {
+  this.oauth2client = new auth.OAuth2(
+    client_id,
+    client_secret,
+    redirect_uri);
+};
+
+GAuth.prototype.set_credentials = function (token) {
+  this.oauth2client.credentials = token;
+  return Promise.resolve(this.oauth2client);
+}
+
+GAuth.prototype.authorize = function() {
+  var self = this;
+  return new Promise(function(resolve, reject){
     fs.readFile(TOKEN_PATH, function(err, token) {
       if (err) {
-        resolve(get_new_token(oauth2client))
+        resolve(self.getNewToken())
       } else {
-        oauth2client.credentials = JSON.parse(token);
-        resolve(oauth2client);
+        resolve(JSON.parse(token))
       }
     });
+  }).then(function(token) {
+    return self.set_credentials(token);
   });
 }
 
-function get_new_token(oauth2client) {
-  var auth_url = oauth2client.generateAuthUrl({
+GAuth.prototype.getNewToken = function() {
+  var self = this;
+  var auth_url = self.oauth2client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES
   });
@@ -39,25 +54,24 @@ function get_new_token(oauth2client) {
   return new Promise(function(resolve, reject) {
     rl.question("Enter the code from that page here: ", function(code) {
       rl.close();
-      oauth2client.getToken(code, function(err, token) {
+      self.oauth2client.getToken(code, function(err, token) {
         if (err) {
           reject("Error while trying to retrieve access token: " + err);
           return;
         }
-        oauth2client.credentials = token;
-        store_token(token);
-        resolve(oauth2client);
+        fs.writeFile(TOKEN_PATH, JSON.stringify(token));
+        console.log("Token stored to " + TOKEN_PATH);
+        resolve(token);
       });
     });
   });
 }
 
-function store_token(token) {
-  fs.writeFile(TOKEN_PATH, JSON.stringify(token));
-  console.log("Token stored to " + TOKEN_PATH);
-}
 
-GClient = function(auth) {
+//
+// class GClient
+//
+var GClient = function(auth) {
   this.service = google.drive({
     version: 'v3',
     auth: auth,
@@ -76,21 +90,52 @@ GClient.prototype.findFile = function(name) {
       }
       var files = resp.files;
       if (files.length != 1) {
-        reject("Unexpected number of files: ", files.length);
-      } else {
-        resolve(files[0]);
+        reject("Unexpected number of files: " + files.length.toString());
+        return;
       }
+      resolve(files[0]);
     });
   });
 }
 
-authorize()
+GClient.prototype.getText = function(fileId) {
+  var files = this.service.files;
+  return new Promise(function(resolve, reject) {
+    files.export({
+      fileId: fileId,
+      mimeType: "text/plain"
+    }, function(err, resp) {
+      if (err) {
+        reject("The API returned an error: " + err);
+        return;
+      }
+      resolve(resp);
+    });
+  });
+}
+
+//
+// main
+//
+filename = "テストファイル"
+
+var gclient;
+var gauth = new GAuth(
+  process.env.AOTRAN_CLIENT_ID,
+  process.env.AOTRAN_CLIENT_SECRET,
+  process.env.AOTRAN_REDIRECT_URI
+)
+gauth.authorize()
 .then(function(auth) {
   gclient = new GClient(auth);
-  return gclient.findFile("秘密");
+  return gclient.findFile(filename);
 })
 .then(function(file) {
   console.log("%s (%s)", file.name, file.id);
+  return gclient.getText(file.id);
+})
+.then(function(text) {
+  fs.writeFile(filename, text);
 })
 .catch(function(err) {
   console.log("Error: ", err)

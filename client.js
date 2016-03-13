@@ -2,6 +2,7 @@ var fs = require('fs');
 var readline = require('readline');
 var google = require('googleapis');
 var googleAuth = require('google-auth-library');
+var Iconv = require('iconv').Iconv;
 
 var SCOPES = [
   // 'https://www.googleapis.com/auth/drive.metadata.readonly',
@@ -104,7 +105,7 @@ GClient.prototype.getText = function(fileId) {
     files.export({
       fileId: fileId,
       mimeType: "text/plain"
-    }, function(err, resp) {
+    }, function(err, body, resp) {
       if (err) {
         reject("The API returned an error: " + err);
         return;
@@ -117,25 +118,37 @@ GClient.prototype.getText = function(fileId) {
 //
 // main
 //
-filename = "テストファイル"
+var filename = "テストファイル";
 
 var gclient;
 var gauth = new GAuth(
   process.env.AOTRAN_CLIENT_ID,
   process.env.AOTRAN_CLIENT_SECRET,
   process.env.AOTRAN_REDIRECT_URI
-)
+);
+
 gauth.authorize()
 .then(function(auth) {
   gclient = new GClient(auth);
-  return gclient.findFile(filename);
+  return new Promise(function(resolve, reject) {
+    fs.readFile("downloads/" + filename+".json", function(err, data) {
+      if(err) {
+        resolve(gclient.findFile(filename));
+      } else {
+        resolve(JSON.parse(data));
+      }
+    });
+  });
 })
 .then(function(file) {
   console.log("%s (%s)", file.name, file.id);
   return gclient.getText(file.id);
 })
-.then(function(text) {
-  fs.writeFile(filename, text);
+.then(function(resp) {
+  var writable = fs.createWriteStream("downloads/" + filename);
+  var iconv = new Iconv('UTF-8', 'cp932//TRANSLIT//IGNORE');
+  writable.write(iconv.convert(resp.body))
+  writable.end();
 })
 .catch(function(err) {
   console.log("Error: ", err)

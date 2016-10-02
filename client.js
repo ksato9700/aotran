@@ -90,6 +90,7 @@ GClient.prototype.findFile = function(name) {
         reject("The API returned an error: " + err);
       }
       var files = resp.files;
+      console.log(files);
       if (files.length != 1) {
         reject("Unexpected number of files: " + files.length.toString());
         return;
@@ -118,7 +119,15 @@ GClient.prototype.getText = function(fileId) {
 //
 // main
 //
-var filename = "テストファイル";
+console.log(process.argv);
+if (process.argv.length < 3) {
+  console.log("Usage: aotran <download-filename> [<output-filename>]")
+  process.exit(-1);
+}
+
+var filename = process.argv[2];
+var outfile = process.argv[3] || filename
+console.log(filename, outfile);
 
 var gclient;
 var gauth = new GAuth(
@@ -145,9 +154,10 @@ gauth.authorize()
   return gclient.getText(file.id);
 })
 .then(function(resp) {
-  var writable = fs.createWriteStream("downloads/" + filename);
+  var writable = fs.createWriteStream("downloads/" + outfile);
   var iconv = new Iconv('UTF-8', 'cp932//TRANSLIT//IGNORE');
   writable.write(iconv.convert(resp.body))
+  writable.write("\r\n");
   writable.end();
 })
 .catch(function(err) {

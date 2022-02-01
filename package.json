@@ -15,8 +15,8 @@
   },
   "license": "BSD-3-Clause",
   "dependencies": {
-    "google-auth-library": "0.9.8",
-    "googleapis": "13.0.0",
-    "iconv": "2.2.1"
+    "google-auth-library": "7.11.0",
+    "googleapis": "94.0.0",
+    "iconv": "3.0.1"
   }
 }
